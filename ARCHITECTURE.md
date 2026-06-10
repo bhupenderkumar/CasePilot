@@ -29,7 +29,7 @@ The solution is designed with the following goals:
 
 ## End-to-End Architecture
 
-![CasePilot V2 — End-to-End Architecture](docs/images/final_architecture.png)
+![CasePilot V2 — End-to-End Architecture](docs/images/final_architecture_v2.png)
 
 ---
 

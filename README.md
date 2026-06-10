@@ -14,7 +14,7 @@ An enterprise-grade AI platform that helps analysts investigate and resolve case
 
 ## Architecture
 
-![CasePilot V2 — End-to-End Architecture](./docs/images/final_architecture.png)
+![CasePilot V2 — End-to-End Architecture](./docs/images/final_architecture_v2.png)
 
 ## Project Structure
 
