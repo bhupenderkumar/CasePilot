@@ -22,9 +22,9 @@ The system provides:
 
 ---
 
-## End-to-End System Flow
+## End-to-End Architecture
 
-![System Flow](docs/images/11-system-flow.png)
+![AI Case Summarization Platform — End-to-End Architecture](docs/images/final_architecture.png)
 
 ---
 
@@ -105,8 +105,6 @@ This enables:
 
 ## High-Level Architecture
 
-![High-Level Architecture](docs/images/01-high-level-architecture.png)
-
 The platform is organized into the following layers:
 
 1. Identity & Access Layer
@@ -162,8 +160,6 @@ Responsibilities:
 
 ## 2. Summary Generation Workflow
 
-![Sequence Diagram — Summary Generation](docs/images/02-sequence-summary-generation.png)
-
 Summary generation is triggered automatically whenever a new case is created.
 
 ### Step 1 — Case Event Published
@@ -201,8 +197,6 @@ Fetches information from:
 
 ### Step 5 — PII Redaction
 
-![PII Redaction](docs/images/10-pii-redaction.png)
-
 Masks sensitive information.
 
 Examples:
@@ -224,13 +218,9 @@ Responsibilities:
 
 ### Step 7 — Context Builder
 
-![Context Window](docs/images/09-context-window.png)
-
 Creates a structured prompt containing all relevant case information.
 
 ### Step 8 — Circuit Breaker & Retry
-
-![Resilience Architecture](docs/images/06-resilience-architecture.png)
 
 Protects the platform from external service failures.
 
@@ -263,8 +253,6 @@ Benefits:
 ---
 
 ## 3. Chat & Q&A Workflow
-
-![Sequence Diagram — Q&A](docs/images/03-sequence-qa-flow.png)
 
 The Chat workflow provides a conversational experience for analysts.
 
@@ -423,8 +411,6 @@ Caches generated context payloads.
 ---
 
 ## 6. Cost Governance
-
-![Cost Tracking](docs/images/07-cost-tracking.png)
 
 AI systems can become expensive without visibility.
 
