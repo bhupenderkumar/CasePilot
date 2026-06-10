@@ -1,671 +1,444 @@
-# AI Case Summarization Platform
+# CasePilot V2
+
+## Enterprise AI Copilot for Case Investigation & Resolution
 
 **Author:** Bhupender Kumar
 **Date:** June 2026
 
 ---
 
-## Overview
+### Core Design Principles
 
-The AI Case Summarization Platform is an enterprise-grade AI solution designed to help analysts quickly understand customer cases and interact with case data using natural language.
-
-The platform combines event-driven processing, conversational AI, privacy-preserving controls, cost governance, and operational observability to deliver secure and scalable AI capabilities.
-
-The system provides:
-
-- Automated case summary generation
-- Conversational Chat & Q&A
-- AI cost governance
-- Security and compliance controls
-- Enterprise-grade reliability
-- Multi-LLM provider support
+- **Security First** — No sensitive data leaves the platform unredacted
+- **Failure Tolerant** — Retry queues, DLQs, circuit breakers, provider failover
+- **Provider Agnostic** — LLM Provider Layer abstracts all AI vendors
+- **Event Driven** — Kafka-based async processing for summary generation
+- **Auditable** — Every AI request tracked with full traceability
+- **Cost Aware** — Per-request token and cost tracking with budget controls
+- **Prompt Governed** — Versioned prompts with rollback, guardrails, and injection detection
+- **Horizontally Scalable** — Stateless services, worker pools, independent databases
 
 ---
 
 ## End-to-End Architecture
 
-![AI Case Summarization Platform — End-to-End Architecture](docs/images/final_architecture.png)
+![CasePilot V2 — End-to-End Architecture](docs/images/final_architecture.png)
 
 ---
 
-## Business Problem
+## System Context
 
-Analysts often spend significant time reviewing data across multiple systems before they can understand a customer case.
+```
+                         ┌────────────────┐
+                         │   Analysts     │
+                         └───────┬────────┘
+                                 │
+                                 ▼
 
-Typical challenges include:
+┌─────────────────────────────────────────────────────┐
+│                     CASEPILOT V2                    │
+│                                                     │
+│ AI Copilot for Case Investigation & Resolution      │
+└───────────────┬─────────────────────┬───────────────┘
+                │                     │
+                ▼                     ▼
 
-- Information spread across multiple services
-- Repetitive manual investigations
-- Slow case resolution
-- Inconsistent analyst experience
-- Limited visibility into AI costs
+      ┌─────────────────┐   ┌─────────────────┐
+      │ Case Management │   │ Customer Data   │
+      │ Systems         │   │ Systems         │
+      └─────────────────┘   └─────────────────┘
 
-The goal of this platform is to reduce analyst effort while maintaining security, compliance, and operational governance.
+                │
+                ▼
 
----
+      ┌─────────────────┐
+      │ LLM Providers   │
+      └─────────────────┘
 
-## Key Design Principles
-
-The architecture follows several core principles:
-
-### Security First
-
-Sensitive customer information is never sent directly to external LLM providers.
-
-All requests pass through:
-
-- PII Redaction
-- Guardrails
-- Content Filtering
-- Audit Logging
-
----
-
-### Provider Agnostic AI
-
-Business services do not communicate directly with a specific model vendor.
-
-Instead, all model interactions go through the LLM Provider Layer.
-
-Benefits:
-
-- Avoid vendor lock-in
-- Support multiple AI providers
-- Optimize cost
-- Improve resiliency
-- Simplify future integrations
+        Azure OpenAI
+        Claude
+        Gemini
+```
 
 ---
 
-### Event-Driven Processing
+## Container Architecture
 
-Summary generation is asynchronous and driven by Kafka events.
+### Identity Layer
 
-Benefits:
+```
+┌──────────────────────────────────────────────────────────┐
+│                    Identity Layer                        │
+├──────────────────────────────────────────────────────────┤
+│ Analyst Browser                                          │
+│ Microsoft Entra ID                                       │
+│ API Gateway                                              │
+│ RBAC                                                     │
+│ Rate Limiting                                            │
+└──────────────────────────────────────────────────────────┘
+```
 
-- Better scalability
-- Loose coupling
-- Improved reliability
-- Independent service scaling
+### Summary Generation Pipeline
+
+```
+Case Event
+     │
+     ▼
+Kafka Topic
+     │
+     ▼
+Summary Request Queue
+     │
+     ▼
+Summary Worker Pool
+     │
+     ▼
+Data Aggregator
+     │
+     ▼
+PII Redaction
+     │
+     ▼
+Prompt Injection Detection
+     │
+     ▼
+Prompt Guardrails
+     │
+     ▼
+Context Builder
+     │
+     ▼
+AI Orchestrator
+     │
+     ▼
+LLM Provider Layer
+     │
+     ▼
+Summary Result Queue
+     │
+     ▼
+Summary Persistence Consumer
+     │
+     ▼
+Summary Database
+
+     ├─────────────► Retry Queue
+     │
+     └─────────────► DLQ
+```
+
+### Chat Architecture
+
+```
+Analyst
+    │
+    ▼
+Chat Service
+    │
+    ▼
+Redis Session Cache
+    │
+    ▼
+PII Redaction
+    │
+    ▼
+Prompt Injection Detection
+    │
+    ▼
+Prompt Guardrails
+    │
+    ▼
+Context Builder
+    │
+    ▼
+AI Orchestrator
+    │
+    ▼
+LLM Provider Layer
+    │
+    ▼
+Response Validation
+    │
+    ▼
+SSE / Streaming Response
+    │
+    ▼
+Chat Database
+```
+
+Chat failure path:
+
+```
+LLM Timeout
+      │
+      ▼
+Chat Retry Queue
+      │
+      ▼
+Retry Worker
+      │
+      ▼
+LLM Provider Layer
+```
 
 ---
 
-### Observability by Design
+## AI Orchestrator
 
-Every critical component exposes metrics, logs, and traces.
+The AI Orchestrator is the central intelligence layer that governs all AI interactions. Business services never call LLM providers directly — everything flows through the orchestrator.
 
-This enables:
-
-- Faster troubleshooting
-- Capacity planning
-- Performance monitoring
-- Cost analysis
-
----
-
-## High-Level Architecture
-
-The platform is organized into the following layers:
-
-1. Identity & Access Layer
-2. Summary Generation
-3. Chat & Q&A
-4. LLM Provider Layer
-5. Data & Cache Layer
-6. Cost Governance
-7. Future AI Enhancements
-8. Observability & Monitoring
-9. Security & Governance
-10. Resilience & Reliability
-
----
-
-## 1. Identity & Access Layer
-
-The Identity Layer ensures only authorized users can access the platform.
-
-### Components
-
-#### Analyst Browser
-
-Primary user interface used by analysts.
+```
+┌───────────────────────────────────────────┐
+│              AI ORCHESTRATOR              │
+├───────────────────────────────────────────┤
+│ Model Selection                           │
+│ Retry Policy                              │
+│ Provider Failover                         │
+│ Token Tracking                            │
+│ Cost Tracking                             │
+│ Prompt Versioning                         │
+│ Response Validation                       │
+│ Routing Decisions                         │
+└───────────────────────────────────────────┘
+```
 
 Responsibilities:
 
-- View generated summaries
-- Ask questions
-- Review chat history
-
-#### Microsoft Entra ID
-
-Handles:
-
-- Authentication
-- Single Sign-On (SSO)
-- Identity Management
-
-#### API Gateway
-
-Acts as the single entry point into the platform.
-
-Responsibilities:
-
-- Authentication validation
-- RBAC authorization
-- Request routing
-- Rate limiting
-- Request validation
+- **Model Selection** — Choose the right model based on task type, cost, and availability
+- **Retry Policy** — Exponential backoff with configurable max attempts
+- **Provider Failover** — Automatic fallback when a provider returns 429 or 5xx
+- **Token Tracking** — Count input/output tokens per request for cost and budget enforcement
+- **Cost Tracking** — Calculate and record per-request cost
+- **Prompt Versioning** — Route to the correct prompt version for each task
+- **Response Validation** — Validate LLM output against expected schema and safety policies
+- **Routing Decisions** — Direct requests to the optimal provider based on latency, cost, and availability
 
 ---
 
-## 2. Summary Generation Workflow
+## Prompt Management
 
-Summary generation is triggered automatically whenever a new case is created.
+```
+AI Orchestrator
+      │
+      ▼
+Prompt Service
+      │
+      ▼
+Prompt Repository
 
-### Step 1 — Case Event Published
-
-Backend systems publish a case-created event to Kafka.
-
-### Step 2 — Kafka Topic
-
-Kafka acts as the event backbone.
+  Version 1
+  Version 2
+  Version 3
+```
 
 Benefits:
 
-- Decoupling
-- Reliability
-- Scalability
+- **Rollback** — Revert to a previous prompt version instantly
+- **Auditability** — Track which prompt version generated which output
+- **A/B Testing** — Compare prompt performance across versions
 
-### Step 3 — Summary Consumer
+---
 
-Consumes case events and orchestrates the summary workflow.
+## LLM Provider Layer
 
-Responsibilities:
+```
+┌────────────────────────────┐
+│     LLM Provider Layer     │
+└─────────────┬──────────────┘
+              │
+    ┌─────────┼─────────┐
+    │         │         │
+    ▼         ▼         ▼
 
-- Event processing
-- Data aggregation
-- Workflow execution
+Azure      Claude     Gemini
+OpenAI
+```
 
-### Step 4 — Data Aggregation
+Failover chain:
 
-Fetches information from:
+```
+Azure OpenAI
+      │
+      ▼
+   429 / 5xx
+      │
+      ▼
+   Claude
+      │
+      ▼
+   Gemini
+```
 
-- User Services
-- Payment Services
-- Session Services
-- Other case-related systems
+No business service is aware of which provider is being used. The LLM Provider Layer handles all provider-specific logic, authentication, and error handling.
 
-### Step 5 — PII Redaction
+---
 
-Masks sensitive information.
+## Caching Layer
 
-Examples:
+```
+Redis
+  │
+  ├── Session Cache       — Conversational context for Chat
+  ├── Summary Cache       — Frequently accessed summaries
+  ├── Response Cache      — Repeated LLM responses
+  ├── Context Cache       — Pre-built context payloads
+  └── Rate Limit Cache    — Per-user/per-service rate tracking
+```
 
-- Customer names
-- Phone numbers
-- Email addresses
-- Account numbers
+---
 
-### Step 6 — Prompt Guardrails
+## Service-Owned Databases
 
-Validates prompt content before sending it to an LLM.
+Each service owns its database — no shared schemas, no cross-service queries.
 
-Responsibilities:
+```
+Chat Service DB         — Conversations, sessions
 
-- Prompt validation
-- Prompt injection protection
-- Policy enforcement
+Summary Service DB      — Generated summaries, versions
 
-### Step 7 — Context Builder
+Audit Service DB        — AI request logs, compliance records
 
-Creates a structured prompt containing all relevant case information.
+Cost Service DB         — Token usage, cost records, budgets
 
-### Step 8 — Circuit Breaker & Retry
-
-Protects the platform from external service failures.
+Prompt Service DB       — Prompt templates, versions, metadata
+```
 
 Benefits:
 
-- Prevent cascading failures
-- Automatic retries
-- Improved availability
-
-### Step 9 — LLM Provider Layer
-
-Generates the case summary.
-
-### Step 10 — Summary Storage
-
-Generated summaries are stored in PostgreSQL.
+- Service isolation
+- Independent scaling
+- Clear data ownership
+- Independent retention policies
 
 ---
 
-### Dead Letter Queue (DLQ)
+## Audit Architecture
 
-Failed messages are routed to the DLQ.
+Every AI request is fully traceable.
 
-Benefits:
+```
+Every AI Request
+        │
+        ▼
+Audit Service
+        │
+        ▼
+Audit Database
+```
 
-- Prevent data loss
-- Enable manual investigation
-- Support replay processing
+Captured fields:
 
----
+```
+UserId
+CaseId
+PromptVersion
+ModelUsed
+Provider
+TokenCount
+Cost
+ResponseStatus
+Timestamp
+CorrelationId
+```
 
-## 3. Chat & Q&A Workflow
-
-The Chat workflow provides a conversational experience for analysts.
-
-### Step 1 — Analyst Question
-
-User submits a question from the UI.
-
-### Step 2 — Chat Service
-
-Acts as the conversation orchestrator.
-
-Responsibilities:
-
-- Session management
-- Request handling
-- Response coordination
-
-### Step 3 — Redis Session Cache
-
-Stores temporary conversational context.
-
-Benefits:
-
-- Faster responses
-- Reduced database access
-
-### Step 4 — PII Redaction
-
-Removes sensitive information.
-
-### Step 5 — Prompt Guardrails
-
-Validates prompts before AI processing.
-
-### Step 6 — Context Builder
-
-Constructs the final prompt.
-
-### Step 7 — LLM Provider Layer
-
-Generates the answer.
-
-### Step 8 — Output Validation
-
-Validates generated content.
-
-Checks include:
-
-- Safety policies
-- Content filtering
-- Response validation
-
-### Step 9 — Response Streaming
-
-Streams the response back to the analyst.
-
-Benefits:
-
-- Better user experience
-- Lower perceived latency
-
-### Step 10 — Chat History Storage
-
-Stores conversations in PostgreSQL.
+This is particularly valuable for a security company — full auditability of every AI interaction.
 
 ---
 
-## 4. LLM Provider Layer
+## Reliability Layer
 
-The LLM Provider Layer abstracts external AI providers from business services.
+```
+Retry Queue              — Transient failure recovery
+DLQ                      — Failed message capture
+Circuit Breaker          — Prevent cascading failures
+Provider Failover        — Automatic LLM provider switching
+Idempotency Store        — Prevent duplicate processing
+Health Checks            — Continuous service monitoring
+```
 
-### Supported Providers
+Idempotency key:
 
-#### Azure OpenAI
+```
+CaseId + PromptVersion
+```
 
-Primary enterprise-grade provider.
-
-#### Anthropic Claude
-
-Used for long-context workloads.
-
-#### Google Gemini
-
-Supports advanced multimodal capabilities.
-
-#### Future Providers
-
-Additional providers can be integrated without modifying business services.
+Prevents duplicate summaries when events are replayed or retried.
 
 ---
 
-### Why an LLM Provider Layer?
+## Security Layer
 
-Without abstraction:
+```
+Entra ID                 — Authentication
+RBAC                     — Authorization
+PII Redaction            — Privacy protection
+Prompt Injection Detection — AI-specific threat prevention
+Prompt Guardrails        — Policy enforcement
+Content Filtering        — Output safety controls
+Audit Logging            — Compliance tracking
+Key Vault                — Secrets management
+```
 
-> Business Service → Azure OpenAI
-
-With abstraction:
-
-> Business Service → LLM Provider Layer → AI Provider
-
-Benefits:
-
-- Vendor independence
-- Failover support
-- Cost optimization
-- Easier experimentation
+Defense in depth — sensitive data is redacted before it leaves the platform, prompts are validated before they reach the LLM, and outputs are filtered before they reach the analyst.
 
 ---
 
-## 5. Data & Cache Layer
+## Cost Governance
 
-### PostgreSQL
+The platform tracks every token and every dollar.
 
-Stores:
+Tracked per request:
 
-- Summaries
-- Chat History
-- Token Usage
-- Metadata
+- Model used
+- Provider
+- Prompt tokens
+- Completion tokens
+- Total cost
+- Timestamp
 
-#### High Availability
+Budget controls:
 
-Each database supports:
-
-- Primary Node
-- Read Replica
-
-Benefits:
-
-- Improved availability
-- Better read performance
+- Per-case spending cap
+- Per-analyst daily limit
+- Global daily budget with alerting
+- Model tier switching when budget is exceeded
 
 ---
 
-### Redis Cache
+## Observability
 
-Redis improves performance and reduces cost.
+Full monitoring and tracing across all services.
 
-#### Session Cache
+- **OpenTelemetry** — Distributed tracing
+- **Azure Monitor** — Infrastructure monitoring
+- **Application Insights** — Application performance
+- **Prometheus** — Metrics collection
+- **Grafana** — Visualization dashboards
+- **Alert Manager** — Operational alerting
 
-Stores conversational sessions.
-
-#### Prompt Cache
-
-Caches repeated prompts.
-
-#### Summary Cache
-
-Stores frequently accessed summaries.
-
-#### Context Cache
-
-Caches generated context payloads.
+Every AI request carries a correlation ID from API Gateway through to the LLM provider and back.
 
 ---
 
-## 6. Cost Governance
+## Future — V3 Roadmap
 
-AI systems can become expensive without visibility.
+```
+Vector Database          — Semantic storage
+Embeddings               — Document vectorization
+RAG Pipeline             — Retrieval-Augmented Generation
+Knowledge Search         — Enterprise knowledge base
+Multi-Agent Workflows    — Agentic AI orchestration
+Feedback Learning Loop   — Human-in-the-loop improvement
+```
 
-The platform includes dedicated cost tracking.
-
-### Cost Service
-
-Calculates:
-
-- Input tokens
-- Output tokens
-- Model usage
-- Request cost
-
-### Token Usage Database
-
-Stores:
-
-- Model name
-- Token consumption
-- Request metadata
-- Cost information
-
-### Benefits
-
-- Budget visibility
-- Cost optimization
-- Chargeback support
-- Capacity planning
+These capabilities can be introduced with minimal impact on existing services due to the modular architecture.
 
 ---
 
-## 7. Future AI Enhancements
+## Summary
 
-The platform is designed to support Retrieval-Augmented Generation (RAG).
+CasePilot V2 introduces an AI Orchestrator, provider abstraction, prompt governance, auditability, retry queues, DLQs, and provider failover to address production concerns such as rate limiting, outages, security controls, and operational governance.
 
-### Planned Components
+The architecture is designed to support enterprise-scale AI workloads while maintaining traceability, resiliency, and future extensibility.
 
-#### Vector Database
-
-Stores embeddings.
-
-#### Embedding Service
-
-Generates semantic embeddings.
-
-#### Document Store
-
-Stores enterprise knowledge.
-
-#### RAG Pipeline
-
-Retrieves relevant documents before AI generation.
-
-Benefits:
-
-- Improved accuracy
-- Reduced hallucinations
-- Better domain knowledge
-
----
-
-## 8. Observability & Monitoring
-
-The platform includes comprehensive observability.
-
-### OpenTelemetry
-
-Distributed tracing.
-
-### Azure Monitor
-
-Infrastructure monitoring.
-
-### Application Insights
-
-Application performance monitoring.
-
-### Prometheus
-
-Metrics collection.
-
-### Grafana
-
-Visualization dashboards.
-
-### Alert Manager
-
-Operational alerting.
-
-Benefits:
-
-- Root cause analysis
-- Performance monitoring
-- Capacity planning
-- Operational excellence
-
----
-
-## 9. Security & Governance
-
-Security is implemented as a cross-cutting concern.
-
-### Security Controls
-
-#### Microsoft Entra ID
-
-Authentication.
-
-#### RBAC
-
-Authorization.
-
-#### Azure Key Vault
-
-Secrets management.
-
-#### PII Redaction
-
-Privacy protection.
-
-#### Content Filtering
-
-AI safety controls.
-
-#### Audit Logging
-
-Compliance tracking.
-
-#### Encryption
-
-- Data in transit
-- Data at rest
-
-#### Data Retention Policies
-
-Managed according to organizational requirements.
-
----
-
-## 10. Resilience & Reliability
-
-The platform is designed for enterprise reliability.
-
-### Reliability Features
-
-#### Kafka Retry Mechanisms
-
-Handles transient failures.
-
-#### Dead Letter Queue
-
-Captures failed events.
-
-#### Circuit Breakers
-
-Prevents cascading failures.
-
-#### Rate Limiting
-
-Protects platform resources.
-
-#### Database Replicas
-
-Improves availability.
-
-#### Redis Caching
-
-Reduces backend load.
-
-#### Health Checks
-
-Continuous service monitoring.
-
-#### Automatic Recovery
-
-Supports self-healing operations.
-
----
-
-## Trade-Offs
-
-### Why Kafka?
-
-Pros:
-
-- Reliable event processing
-- Scalability
-- Loose coupling
-
-Cons:
-
-- Additional operational complexity
-- Eventual consistency
-
----
-
-### Why PostgreSQL?
-
-Pros:
-
-- Mature ecosystem
-- Strong consistency
-- Reliable transactions
-
-Cons:
-
-- Vertical scaling limitations
-
----
-
-### Why Redis?
-
-Pros:
-
-- Extremely low latency
-- Reduced infrastructure load
-
-Cons:
-
-- Additional operational component
-
----
-
-### Why LLM Provider Layer?
-
-Pros:
-
-- Vendor independence
-- Easier provider switching
-- Better resiliency
-
-Cons:
-
-- Additional abstraction layer
-
----
-
-## Future Roadmap
-
-Potential future enhancements include:
-
-- Agentic AI workflows
-- Multi-model routing
-- Automatic model selection
-- Human feedback loop
-- AI quality evaluation framework
-- Semantic search
-- Advanced RAG capabilities
-- Cost optimization engine
-
----
-
-## Conclusion
-
-The AI Case Summarization Platform provides a secure, scalable, and maintainable architecture for enterprise AI adoption. By combining event-driven processing, privacy-preserving controls, multi-provider AI support, and comprehensive operational governance, the platform enables analysts to work more efficiently while maintaining security, compliance, and cost control.
-
-The architecture is intentionally modular and extensible, allowing future AI capabilities to be integrated with minimal disruption to existing services.
+> The biggest change from V1: we moved from **calling an LLM** to **operating an AI platform**.
