@@ -19,6 +19,17 @@ V2 is a full rewrite. V1 was a straightforward "call GPT and return the response
 
 ![CasePilot V2 — End-to-End Architecture](docs/images/final_architecture.png)
 
+### Diagrams
+
+| # | Diagram | Description |
+|---|---|---|
+| 1 | [System Context](docs/system_context.md) | High-level view — CasePilot and its external dependencies |
+| 2 | [Architecture](docs/architecture.md) | Main architecture — summary generation, chat, cost tracking flows |
+| 3 | [Summary Sequence](docs/summary_sequence.md) | Step-by-step flow for async summary generation |
+| 4 | [Chat Sequence](docs/chat_sequence.md) | Step-by-step flow for real-time Q&A |
+| 5 | [Component](docs/component.md) | Service responsibilities and data store ownership |
+| 6 | [Deployment](docs/deployment.md) | Azure deployment topology |
+
 ---
 
 ## The Problem
